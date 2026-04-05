@@ -1,0 +1,38 @@
+.footer {
+  background: var(--black);
+  padding: 32px 40px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-top: 64px;
+}
+
+.logo {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--white);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.footer a {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  text-decoration: none;
+  transition: var(--trans);
+}
+
+.footer a:hover {
+  color: var(--white);
+}
+
+.copy {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--gray-500);
+  letter-spacing: 0.5px;
+}

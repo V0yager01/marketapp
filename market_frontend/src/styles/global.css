@@ -1,0 +1,38 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --black: #0A0A0A;
+  --white: #FFFFFF;
+  --gray-100: #F4F4F4;
+  --gray-200: #E8E8E8;
+  --gray-500: #A0A0A0;
+  --gray-700: #555;
+  --radius: 0px;
+  --trans: all .2s ease;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--white);
+  color: var(--black);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}

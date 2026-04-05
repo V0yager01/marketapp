@@ -1,0 +1,53 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.overlay.visible {
+  pointer-events: all;
+  opacity: 1;
+}
+
+.blur {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.spinner {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+
+.spinner::before,
+.spinner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+
+.spinner::before {
+  border-top-color: var(--black);
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner::after {
+  border-bottom-color: var(--gray-500);
+  animation: spin 1.4s linear infinite reverse;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
