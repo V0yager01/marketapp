@@ -303,45 +303,60 @@ frontend:
 
 ## Инициализация Docker Swarm
 
-### Шаг 1. На Manager-1
+### Шаг 1. Установка Docker (на обоих серверах)
 
 ```bash
-# SSH на manager-1
-ssh user@192.168.1.10
-
-# Инициализировать Swarm
-docker swarm init --advertise-addr 192.168.1.10
-
-# Выведет что-то типа:
-# Swarm initialized: current node (abc123...) is now a manager.
-# 
-# To add a worker to this swarm, run the following command:
-#
-#     docker swarm join --token SWMTKN-1-5e... 192.168.1.10:2377
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
-### Шаг 2. На Worker-1
+### Шаг 2. Открыть порты (на обоих серверах)
 
 ```bash
-# SSH на worker-1
-ssh user@192.168.1.11
-
-# Присоединить к Swarm
-docker swarm join --token SWMTKN-1-5e... 192.168.1.10:2377
-
-# Проверка (выведет "This node joined a swarm as a worker")
+sudo ufw allow 2377/tcp   # управление кластером
+sudo ufw allow 7946/tcp   # связь между нодами
+sudo ufw allow 7946/udp   # связь между нодами
+sudo ufw allow 4789/udp   # overlay-сеть VXLAN — обязательно!
+sudo ufw allow 80/tcp     # входящий трафик
 ```
 
-### Шаг 3. Проверка статуса
+> **Важно:** порт 4789 UDP — самая частая причина проблем. Если overlay-сеть не работает и контейнеры не видят друг друга между нодами — в первую очередь проверяй этот порт. Также проверь firewall на уровне хостера.
+
+### Шаг 3. На Manager-1
 
 ```bash
-# На manager-1 — список нод
+docker swarm init --advertise-addr <IP_сервера_1>
+```
+
+Команда выдаст токен — скопировать его целиком:
+
+```
+docker swarm join --token SWMTKN-1-xxxxxx <IP_сервера_1>:2377
+```
+
+Если потерял токен — получить заново:
+
+```bash
+docker swarm join-token worker
+```
+
+### Шаг 4. На Worker-1
+
+```bash
+docker swarm join --token SWMTKN-1-xxxxxx <IP_сервера_1>:2377
+```
+
+### Шаг 5. Проверка статуса (на Manager-1)
+
+```bash
 docker node ls
+```
 
-# Результат:
-# ID                            HOSTNAME    STATUS    AVAILABILITY   MANAGER STATUS
-# abcd1234 *                    manager-1   Ready     Active         Leader
-# efgh5678                       worker-1    Ready     Active
+```
+ID             HOSTNAME    STATUS    AVAILABILITY   MANAGER STATUS
+abc123 *       server-1    Ready     Active         Leader
+xyz456         server-2    Ready     Active
 ```
 
 ---
@@ -350,55 +365,68 @@ docker node ls
 
 ### Подготовка образов
 
-**Вариант A: Docker Registry (рекомендован)**
+Swarm не передаёт образы между нодами автоматически — каждая нода должна иметь образ локально. Клонировать репозиторий и собирать на **обоих серверах**:
 
 ```bash
-# На manager-1: поднять локальный registry
-docker service create \
-  --name registry \
-  --publish 5000:5000 \
-  --constraint=node.role==manager \
-  registry:2
-
-# Собрать образы и запушить
-docker build -t 192.168.1.10:5000/market-backend:latest ./market_backend
-docker push 192.168.1.10:5000/market-backend:latest
-
-docker build -t 192.168.1.10:5000/market-frontend:latest ./market_frontend
-docker push 192.168.1.10:5000/market-frontend:latest
+# На сервере 1
+cd /opt/marketapp
+docker build -t market-backend:latest ./market_backend
+docker build -t market-frontend:latest ./market_frontend
 ```
 
-**Вариант B: Build локально на каждой ноде (для курсового проекта)**
-
 ```bash
-# На каждой ноде (manager-1, worker-1, worker-2)
-git clone https://github.com/your-user/marketapp.git /opt/marketapp
-cd /opt/marketapp
-
+# На сервере 2
+cd ~/marketapp
 docker build -t market-backend:latest ./market_backend
 docker build -t market-frontend:latest ./market_frontend
 ```
 
 ### Деплой Stack
 
+Деплоить только с Manager-ноды (сервер 1):
+
 ```bash
-# На manager-1
 cd /opt/marketapp
 
 # Загрузить переменные окружения
-export $(cat .env | xargs)
+export $(cat .env | grep -v '^#' | xargs)
 
 # Развернуть стек
 docker stack deploy -c docker-compose.swarm.yml market
 
-# Проверить развёртывание
-docker stack services market
+# Дождаться запуска всех реплик (REPLICAS должно быть N/N)
+watch docker stack services market
+```
 
-# Результат:
-# NAME              MODE       REPLICAS   IMAGE
-# market_backend    replicated 3/3        market-backend:latest
-# market_db         replicated 1/1        postgres:16-alpine
-# market_frontend   replicated 2/2        market-frontend:latest
+Ожидаемый вывод:
+
+```
+NAME              MODE       REPLICAS   IMAGE
+market_backend    replicated 3/3        market-backend:latest
+market_db         replicated 1/1        postgres:16-alpine
+market_frontend   replicated 2/2        market-frontend:latest
+```
+
+Проверить распределение по нодам:
+
+```bash
+docker service ps market_backend
+```
+
+Реплики должны быть на обоих серверах:
+
+```
+NAME               NODE        STATUS
+market_backend.1   server-1    Running
+market_backend.2   server-2    Running
+market_backend.3   server-1    Running
+```
+
+Если реплика зависла в статусе `Rejected` — значит на этой ноде нет образа. Собрать образ на нужной ноде и принудительно обновить сервис:
+
+```bash
+docker service update --force market_backend
+docker service update --force market_frontend
 ```
 
 ---
