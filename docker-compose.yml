@@ -1,57 +1,46 @@
-version: "3.9"
+version: '3.8'
 
 services:
   db:
-    image: postgres:16-alpine
-    restart: unless-stopped
+    image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-marketdb}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marketdb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - app_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-marketdb}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   backend:
     build:
       context: ./market_backend
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-marketdb}
-      SECRET_KEY: ${SECRET_KEY:-changeme-secret-key}
-    ports:
-      - "8000:8000"
+      dockerfile: Dockerfile
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - app_net
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/marketdb
+      SECRET_KEY: changeme-secret-key
     volumes:
-      - uploads:/app/app/static/uploads
+      - ./market_backend:/app
+    expose:
+      - "8000"
 
-  frontend:
-    build:
-      context: ./market_frontend
-    restart: unless-stopped
+  nginx:
+    image: nginx:latest
     ports:
       - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - backend
-    networks:
-      - app_net
+    restart: unless-stopped
 
 volumes:
   postgres_data:
-  uploads:
-
-networks:
-  app_net:
-    driver: bridge
